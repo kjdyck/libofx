@@ -19,13 +19,13 @@ cmdline.c cmdline.h: cmdline.ggo Makefile
 endif
 MAINTAINERCLEANFILES  = cmdline.c cmdline.h
 
-EXTRA_DIST = cmdline.ggo test-privateserver.sh
+EXTRA_DIST = cmdline.ggo test-privateserver.sh CMakeLists.txt
 
 # See README.privateserver for details on this server and how to get
 # the key needed to run this test.
 TESTS = test-privateserver.sh 
 
-ofxconnect.1: ofxconnect$(EXEEXT) $(top_srcdir)/configure.ac
+ofxconnect.1: $(top_srcdir)/configure.ac
 if HAVE_HELP2MAN
 	$(HELP2MAN)  -n 'Create a statement request file' -N --output=ofxconnect.1 ./ofxconnect$(EXEEXT)
 else

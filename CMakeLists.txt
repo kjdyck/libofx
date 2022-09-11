@@ -2,7 +2,12 @@
 # SPDX-License-Identifier: GPL-2.0-or-later
 
 cmake_minimum_required(VERSION 3.12)
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
+
+if (${CMAKE_VERSION} VERSION_LESS 3.25.0)
+    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
+endif ()
+
+include(GNUInstallDirs)
 include(CMakeDependentOption)
 include(FeatureSummary)
 
@@ -34,15 +39,23 @@ endif ()
 # actually set up the project
 project(libofx)
 
+# This is the project version
 set(LIBOFX_MAJOR_VERSION 0)
 set(LIBOFX_MINOR_VERSION 10)
-set(LIBOFX_MICRO_VERSION 5)
+set(LIBOFX_MICRO_VERSION 7)
 set(LIBOFX_VERSION_RELEASE_STRING ${LIBOFX_MAJOR_VERSION}.${LIBOFX_MINOR_VERSION}.${LIBOFX_MICRO_VERSION})
+
+# This is the library version (SONAME) so affects ABI
+# LIBOFX_LIBRARY_SONAME must be changed when ABI is broken (backwards compat)
+# LIBOFX_LIBRARY_VERSION must be changed if just adding new functions and such (backwards compat not broken)
+set(LIBOFX_LIBRARY_SONAME 7)
+set(LIBOFX_LIBRARY_VERSION ${LIBOFX_LIBRARY_SONAME}.0.2)
 
 # If no build type is set, use "Release with Debug Info"
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE RelWithDebInfo)
 endif (NOT CMAKE_BUILD_TYPE)
+include(CTest)
 
 # locate required dependencies
 find_package(OpenSP)
@@ -100,31 +113,25 @@ if (BUILD_SHARED_LIBS AND MSVC)
 endif ()
 
 # set up SP_MULTI_BYTE
-option(DISABLE_OPENSP_MULTIBYTE "Force ${CMAKE_PROJECT_NAME} to compile with the assumption that OpenSP was NOT compiled with SP_MULTI_BYTE defined" OFF)
+set(FORCE_OPENSP_MULTIBYTE AUTO CACHE STRING "Whether to let FindOpenSP CMake module auto-detect the SP_MULTIBYTE value (leave 'AUTO'), or to override it with 'ON' or 'OFF'")
+set_property(CACHE FORCE_OPENSP_MULTIBYTE PROPERTY STRINGS AUTO ON OFF)
 
-if (OpenSP_INCLUDE_DIR AND EXISTS "${OpenSP_INCLUDE_DIR}/config.h")
-    file(STRINGS "${OpenSP_INCLUDE_DIR}/config.h" opensp_multibyte_str REGEX "^#define[\t ]+SP_MULTI_BYTE[ \t]+[01].*$")
-    if (opensp_multibyte_str)
-        string(REGEX REPLACE "^#define[\t ]+SP_MULTI_BYTE[ \t]+([01]).*$" "\\1" SP_MULTI_BYTE "${opensp_multibyte_str}")
-        if (SP_MULTI_BYTE STREQUAL "")
-            message(STATUS "SP_MULTI_BYTE detected but not set to any value, ignoring")
-        else ()
-            message(STATUS "SP_MULTI_BYTE detected to be ${SP_MULTI_BYTE}")
-        endif ()
-    endif ()
-    unset(opensp_multibyte_str)
-endif ()
+# CheckCXXSymbolExists returns "" if symbol is not found
+if (NOT OpenSP_MULTI_BYTE)
+    set(OpenSP_MULTI_BYTE 0)
+endif()
 
-if (NOT DISABLE_OPENSP_MULTIBYTE AND NOT SP_MULTI_BYTE)
-    set(SP_MULTI_BYTE 1)
-    message(STATUS "Could not detect SP_MULTI_BYTE, assuming to be 1")
-elseif (DISABLE_OPENSP_MULTIBYTE)
-    if (SP_MULTI_BYTE)
-        message(WARNING "SP_MULTI_BYTE detected to be 1, but forced to be 0. If this is not indeded, it may lead to inability to process files correctly!")
+message(CHECK_START "Setting up the SP_MULTI_BYTE")
+set(SP_MULTI_BYTE OpenSP_MULTI_BYTE)
+if (NOT FORCE_OPENSP_MULTIBYTE STREQUAL "AUTO")
+    if (NOT FORCE_OPENSP_MULTIBYTE EQUAL OpenSP_MULTI_BYTE)
+        message(CHECK_PASS "detected by FindOpenSP to be ${OpenSP_MULTI_BYTE}, but overriding to ${FORCE_OPENSP_MULTIBYTE}, as set by FORCE_OPENSP_MULTIBYTE. If this is not indeded, it can cause wide character processing issues!")
+        set(SP_MULTI_BYTE ${FORCE_OPENSP_MULTIBYTE})
     else ()
-        message(STATUS "SP_MULTI_BYTE forced to 0")
+        message(CHECK_PASS "detected by FindOpenSP to be ${OpenSP_MULTI_BYTE}, with FORCE_OPENSP_MULTIBYTE also set to ${FORCE_OPENSP_MULTIBYTE}")
     endif ()
-    set(SP_MULTI_BYTE 0)
+else ()
+    message(CHECK_PASS "detected by FindOpenSP to be ${OpenSP_MULTI_BYTE}. Use FORCE_OPENSP_MULTIBYTE to set a different value")
 endif ()
 
 # Disable CRT warnings
@@ -132,14 +139,14 @@ if (MSVC)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif ()
 
-#TODO: once Autotools build stuff is gone, remove these and set them directly in libofx.pc.in itself
+# TODO: once Autotools build stuff is gone, remove these and set them directly in libofx.pc.in itself
 set(OPENSPLIBS ${OpenSP_LIBRARIES})
 set(OPENSPINCLUDES ${OpenSP_INCLUDE_DIRS})
 set(VERSION ${LIBOFX_VERSION_RELEASE_STRING})
 set(prefix "${CMAKE_INSTALL_PREFIX}")
 set(exec_prefix "\${prefix}")
-set(libdir "\${prefix}/lib")
-set(includedir "\${prefix}/include")
+set(libdir "\${prefix}/${CMAKE_INSTALL_LIBDIR}")
+set(includedir "\${prefix}/${CMAKE_INSTALL_INCLUDEDIR}")
 
 # create the libofx.h file out of the libofx.h.in
 configure_file("inc/libofx.h.in" "${CMAKE_CURRENT_BINARY_DIR}/inc/libofx.h")
@@ -170,6 +177,9 @@ if (ENABLE_OFX2QIF)
     add_subdirectory(ofx2qif)
 endif ()
 
+# TODO: wire up docs
+# TODO: wire up tests
+
 # set up vcpkg integration
 option(ENABLE_VCPKG_INTEGRATION "Enable vcpkg integration" OFF)
 add_feature_info("vcpkg" ENABLE_VCPKG_INTEGRATION "Enables integration with vcpkg, a C++ library manager")
@@ -191,9 +201,9 @@ endif ()
 # create the libofx.pc pkg-config file out of the libofx.pc.in
 configure_file("libofx.pc.in" "${CMAKE_BINARY_DIR}/libofx.pc")
 
-install(DIRECTORY dtd DESTINATION share/libofx FILES_MATCHING PATTERN "*.dtd" PATTERN "*.dcl")
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/inc/libofx.h" DESTINATION include/libofx)
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/libofx.pc" DESTINATION lib/pkgconfig)
+install(DIRECTORY dtd DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/libofx FILES_MATCHING PATTERN "*.dtd" PATTERN "*.dcl")
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/inc/libofx.h" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/libofx.pc" DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 feature_summary(WHAT REQUIRED_PACKAGES_NOT_FOUND
         DESCRIPTION "The following REQUIRED packages have not been found:")

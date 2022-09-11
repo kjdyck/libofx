@@ -15,7 +15,7 @@ cmdline.c cmdline.h: cmdline.ggo Makefile
 
 endif
 
-ofxdump.1: ofxdump$(EXEEXT) $(top_srcdir)/configure.ac
+ofxdump.1: $(top_srcdir)/configure.ac
 if HAVE_HELP2MAN
 	$(HELP2MAN) -n 'Dump content of OFX files as human-readable text' -N --output=ofxdump.1 ./ofxdump$(EXEEXT)
 else
@@ -23,7 +23,7 @@ else
 endif
 
 MAINTAINERCLEANFILES  = cmdline.c cmdline.h
-EXTRA_DIST = cmdline.ggo
+EXTRA_DIST = cmdline.ggo CMakeLists.txt
 
 # Run all our example files through ofxdump to verify we can parse
 # them without failure
