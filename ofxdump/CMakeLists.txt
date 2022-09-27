@@ -7,8 +7,7 @@ set(ofxdump_SRCS
 )
 
 add_executable(ofxdump ${ofxdump_SRCS})
-target_link_libraries(ofxdump ofx)
-target_include_directories(ofxdump BEFORE PRIVATE ${COMMON_INCLUDE_DIRS})
+target_link_libraries(ofxdump libofx)
 target_compile_definitions(ofxdump PRIVATE CMDLINE_PARSER_PACKAGE="ofxdump"
         CMDLINE_PARSER_PACKAGE_NAME="ofxdump"
         CMDLINE_PARSER_VERSION="${LIBOFX_VERSION_RELEASE_STRING}"
@@ -31,6 +30,8 @@ set (SAMPLE_OFX_FILENAMES_FAILING
   failing-ofx-file1.xml
   failing-ofx-file2.xml
   ofx-2.1.1-sect-13.13.ofx
+  ofx_sample_files/null-ptr-deref-1.ofx
+  ofx_sample_files/null-ptr-deref-2.ofx
 )
 # This is the list of all sample files (good and fail)
 set (SAMPLE_OFX_FILENAMES
