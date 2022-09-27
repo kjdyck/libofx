@@ -202,7 +202,7 @@ endif ()
 configure_file("libofx.pc.in" "${CMAKE_BINARY_DIR}/libofx.pc")
 
 install(DIRECTORY dtd DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/libofx FILES_MATCHING PATTERN "*.dtd" PATTERN "*.dcl")
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/inc/libofx.h" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/inc/libofx.h" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/libofx)
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/libofx.pc" DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 
 feature_summary(WHAT REQUIRED_PACKAGES_NOT_FOUND
@@ -216,3 +216,20 @@ feature_summary(WHAT ENABLED_FEATURES
 
 feature_summary(WHAT DISABLED_FEATURES
         DESCRIPTION "The following features have been disabled:")
+
+# ############################################################
+# Package creation rules
+
+if(UNIX)
+  set(CPACK_GENERATOR "TGZ")
+  set(CPACK_SOURCE_GENERATOR "TGZ")
+endif()
+
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "This library is a client and file format implementation for the financial format OFX (Open Financial Exchange)")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
+set(CPACK_PACKAGE_VERSION_MAJOR ${LIBOFX_MAJOR_VERSION})
+set(CPACK_PACKAGE_VERSION_MINOR ${LIBOFX_MINOR_VERSION})
+set(CPACK_PACKAGE_VERSION_PATCH ${LIBOFX_MICRO_VERSION})
+set(CPACK_SOURCE_IGNORE_FILES "/build.*/;/\\\\.git/;.*~;\\\\.vscode;\\\\.github")
+
+include (CPack)
